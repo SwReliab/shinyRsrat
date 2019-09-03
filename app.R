@@ -8,51 +8,7 @@
 #
 
 library(shiny)
-library(Rsrat)
-
-result.table <- function(result) {
-  ct <- sum(result[[1]]$srm$data$time)
-  data.frame(
-    name=sapply(result, function(x) x$srm$name),
-    llf=sapply(result, function(x) x$llf),
-    df=sapply(result, function(x) x$df),
-    aic=sapply(result, function(x) x$aic),
-    "Residual faults"=sapply(result, function(x) x$srm$residual(ct)),
-    FFP=sapply(result, function(x) x$srm$ffp(ct))
-  )
-}
-
-estimate.group <- function(x, y, models) {
-  result <- fit.srm.nhpp(time=x, fault=y, srm.names=models, selection=NULL)
-  if (length(models) == 1) {
-    result <- list(result)
-  }
-  result
-}
-
-estimate.general <- function(x, y, z, models) {
-  result <- fit.srm.nhpp(time=x, fault=y, type=z, srm.names=models, selection=NULL)
-  if (length(models) == 1) {
-    result <- list(result)
-  }
-  result
-}
-
-change.data.column <- function(input, output, csv_file) {
-  output$time <- renderUI({ 
-    selectInput("time", "Time interval", colnames(csv_file()))
-  })
-  output$fault <- renderUI({ 
-    selectInput("fault", "# of faults", colnames(csv_file()))
-  })
-  if (input$type == "Count") {
-    output$indicator <- renderUI({})
-  } else if (input$type == "General") {
-    output$indicator <- renderUI({ 
-      selectInput("indicator", "Indicator", colnames(csv_file()))
-    })
-  }
-}
+source("functions.R")
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -75,14 +31,17 @@ ui <- fluidPage(
        htmlOutput("fault"),
        htmlOutput("indicator"),
        checkboxGroupInput("models", "Models:", choices = srm.models, selected = srm.models),
-       actionButton("submit", "Estimate")
+       actionButton("submit", "Estimate"),
+       tags$hr(),
+       actionButton("execeic", "Estimate and Compute EIC")
      ),
      
       # Show a plot of the generated distribution
       mainPanel(
         tabsetPanel(type = "tabs", id = "mantabs",
                     tabPanel("Data", value = "tab1", tableOutput('table')),
-                    tabPanel("Result", value = "tab2", plotOutput('mvf'), dataTableOutput('result'))
+                    tabPanel("Result", value = "tab2", plotOutput('mvf'), dataTableOutput('result')),
+                    tabPanel("Evaluation", value = "tab3", dataTableOutput('eval'))
         )
       )
    )
@@ -91,36 +50,79 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
 
-  observeEvent(input$file, {
-    csv_file <- reactive(read.csv(input$file$datapath))
-    output$table <- renderTable(csv_file())
-    change.data.column(input, output, csv_file)
-  })
+  models <- reactive(c(input$models))
   
-  observeEvent(input$submit, {
-    models <- c(input$models)
-    csv_file <- reactive(read.csv(input$file$datapath))
-    
+  csv_file <- reactive(read.csv(input$file$datapath))
+
+  data <- reactive({
     if (input$type == "Count") {
       x <- csv_file()[[input$time]]
       y <- csv_file()[[input$fault]]
-      result <- estimate.group(x, y, models)
+      faultdata(time=x, fault=y)
     } else if (input$type == "General") {
       x <- csv_file()[[input$time]]
       y <- csv_file()[[input$fault]]
       z <- csv_file()[[input$indicator]]
-      result <- estimate.general(x, y, z, models)
+      faultdata(time=x, fault=y, type=z)
     }
+  })
+
+  estimate <- reactive({
+    estimate.ordinary(data(), models())
+    # result <- c(result, estimate.cph(data, 2:10))
+  })
+
+  observeEvent(input$file, {
+    output$table <- renderTable(csv_file())
+
+    output$time <- renderUI({
+      selectInput("time", "Time interval", colnames(csv_file()))
+    })
+    
+    output$fault <- renderUI({
+      selectInput("fault", "# of faults", colnames(csv_file()))
+    })
+    
+    output$indicator <- renderUI({
+      if (input$type == "General") {
+        selectInput("indicator", "Indicator", colnames(csv_file()))
+      }
+    })
+  })
+  
+  observeEvent(input$submit, {
+    result <- estimate()
 
     output$result <- renderDataTable(
-      result.table(result),
-      options = list(paging = FALSE, searching = FALSE)
+      gof(result, eic = FALSE), options = list(paging = FALSE, searching = FALSE)
+    )
+
+    output$eval <- renderDataTable(
+      reliab(lapply(models(), function(m) result[[m]])), options = list(paging = FALSE, searching = FALSE)
     )
 
     output$mvf <- renderPlot({
-      mvfplot(data = result[[1]]$srm$data, mvf=sapply(result, function(x) x$srm))
+      mvfplot(data = data(), mvf=lapply(models(), function(m) result[[m]]$srm))
     })
 
+    updateTabsetPanel(session, "mantabs", selected = "tab2")
+  })
+
+  observeEvent(input$execeic, {
+    result <- estimate()
+
+    output$result <- renderDataTable(
+      gof(result, eic = TRUE), options = list(paging = FALSE, searching = FALSE)
+    )
+    
+    output$eval <- renderDataTable(
+      reliab(lapply(models(), function(m) result[[m]])), options = list(paging = FALSE, searching = FALSE)
+    )
+    
+    output$mvf <- renderPlot({
+      mvfplot(data = data(), mvf=lapply(models(), function(m) result[[m]]$srm))
+    })
+    
     updateTabsetPanel(session, "mantabs", selected = "tab2")
   })
 }

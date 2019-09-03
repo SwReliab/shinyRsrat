@@ -5,6 +5,6 @@ account: okamumu
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 1137580
-bundleId: 2379105
+bundleId: 2382789
 url: https://okamumu.shinyapps.io/shinyrsrat/
-when: 1567462440.22114
+when: 1567554208.6321
