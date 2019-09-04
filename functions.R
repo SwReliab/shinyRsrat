@@ -1,12 +1,12 @@
 library(Rsrat)
 library(Rphsrm)
-library(Rmpfr)
 library(gof4srm)
 
 estimate.ordinary <- function(data, models) {
   result <- fit.srm.nhpp(time=data$time, fault=data$fault, type=data$type, srm.names=models, selection=NULL)
   if (length(models) == 1) {
     result <- list(result)
+    names(result) <- result[[1]]$srm$name
   }
   result
 }
@@ -15,6 +15,7 @@ estimate.cph <- function(data, phases) {
   result <- fit.srm.cph(time=data$time, fault=data$fault, type=data$type, phase=phases, selection=NULL)
   if (length(phases) == 1) {
     result <- list(result)
+    names(result) <- result[[1]]$srm$name
   }
   result
 }

@@ -30,10 +30,13 @@ ui <- fluidPage(
        htmlOutput("time"),
        htmlOutput("fault"),
        htmlOutput("indicator"),
-       checkboxGroupInput("models", "Models:", choices = srm.models, selected = srm.models),
+       tags$hr(),
+       checkboxGroupInput("usemodels", "Use:", choices = srm.models, selected = srm.models),
+       textInput("nphase", "Phase:"),
+       checkboxInput("useeic", "Use EIC", value = FALSE),
        actionButton("submit", "Estimate"),
        tags$hr(),
-       actionButton("execeic", "Estimate and Compute EIC")
+       htmlOutput("mm")
      ),
      
       # Show a plot of the generated distribution
@@ -50,7 +53,11 @@ ui <- fluidPage(
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
 
-  models <- reactive(c(input$models))
+  estmodels <- reactive(input$usemodels)
+
+  models <- reactive(input$models)
+  
+  phases <- reactive(eval(parse(text=paste("c(", input$nphase, ")"))))
   
   csv_file <- reactive(read.csv(input$file$datapath))
 
@@ -68,10 +75,20 @@ server <- function(input, output, session) {
   })
 
   estimate <- reactive({
-    estimate.ordinary(data(), models())
-    # result <- c(result, estimate.cph(data, 2:10))
+    result <- list()
+    if (length(estmodels()) != 0) {
+      result <- c(result, estimate.ordinary(data(), estmodels()))
+    }
+    if (!is.null(phases())) {
+      result <- c(result, estimate.cph(data(), phases()))
+    }
+    result
   })
 
+  checkeic <- reactive({
+    input$useeic
+  })
+  
   observeEvent(input$file, {
     output$table <- renderTable(csv_file())
 
@@ -88,41 +105,19 @@ server <- function(input, output, session) {
         selectInput("indicator", "Indicator", colnames(csv_file()))
       }
     })
+    
   })
   
   observeEvent(input$submit, {
     result <- estimate()
-
-    output$result <- renderDataTable(
-      gof(result, eic = FALSE), options = list(paging = FALSE, searching = FALSE)
-    )
-
-    output$eval <- renderDataTable(
-      reliab(lapply(models(), function(m) result[[m]])), options = list(paging = FALSE, searching = FALSE)
-    )
-
-    output$mvf <- renderPlot({
-      mvfplot(data = data(), mvf=lapply(models(), function(m) result[[m]]$srm))
+    output$maxtime <- cat(sum(data()$time))
+    mname <- lapply(result, function(m) m$srm$name)
+    output$mm <- renderUI({
+      checkboxGroupInput("models", "Models:", choices = mname, selected = mname)
     })
-
-    updateTabsetPanel(session, "mantabs", selected = "tab2")
-  })
-
-  observeEvent(input$execeic, {
-    result <- estimate()
-
-    output$result <- renderDataTable(
-      gof(result, eic = TRUE), options = list(paging = FALSE, searching = FALSE)
-    )
-    
-    output$eval <- renderDataTable(
-      reliab(lapply(models(), function(m) result[[m]])), options = list(paging = FALSE, searching = FALSE)
-    )
-    
-    output$mvf <- renderPlot({
-      mvfplot(data = data(), mvf=lapply(models(), function(m) result[[m]]$srm))
-    })
-    
+    output$result <- renderDataTable(gof(result, eic = checkeic()), options = list(paging = FALSE, searching = FALSE))
+    output$eval <- renderDataTable(reliab(lapply(models(), function(m) result[[m]])), options = list(paging = FALSE, searching = FALSE))
+    output$mvf <- renderPlot(mvfplot(data = data(), mvf=lapply(models(), function(m) result[[m]]$srm)))
     updateTabsetPanel(session, "mantabs", selected = "tab2")
   })
 }
