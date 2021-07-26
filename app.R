@@ -31,7 +31,7 @@ ui <- fluidPage(
        htmlOutput("fault"),
        htmlOutput("indicator"),
        tags$hr(),
-       checkboxGroupInput("usemodels", "Use:", choices = srm.models, selected = srm.models),
+       checkboxGroupInput("usemodels", "Use:", choices = srm.models, selected = NULL),
        textInput("nphase", "Phase:"),
        checkboxInput("useeic", "Use EIC", value = FALSE),
        actionButton("submit", "Estimate"),
@@ -109,16 +109,19 @@ server <- function(input, output, session) {
   })
   
   observeEvent(input$submit, {
+    showModal(modalDialog("Estimating...", footer=NULL))
     result <- estimate()
     output$maxtime <- cat(sum(data()$time))
     mname <- lapply(result, function(m) m$srm$name)
     output$mm <- renderUI({
       checkboxGroupInput("models", "Models:", choices = mname, selected = mname)
     })
-    output$result <- renderDataTable(gof(result, eic = checkeic()), options = list(paging = FALSE, searching = FALSE))
+    vv <- checkeic()
+    output$result <- renderDataTable(gof(result, eic = vv), options = list(paging = FALSE, searching = FALSE))
     output$eval <- renderDataTable(reliab(lapply(models(), function(m) result[[m]])), options = list(paging = FALSE, searching = FALSE))
-    output$mvf <- renderPlot(mvfplot(data = data(), mvf=lapply(models(), function(m) result[[m]]$srm)))
+    output$mvf <- renderPlot(mvfplot(data = data(), srms=lapply(models(), function(m) result[[m]])))
     updateTabsetPanel(session, "mantabs", selected = "tab2")
+    removeModal()
   })
 }
 
