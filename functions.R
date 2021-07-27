@@ -21,12 +21,14 @@ estimate.cph <- function(data, phases) {
 }
 
 gof <- function(result, eic) {
+  ksres <- lapply(result, ks.srm.test)
   if (eic == TRUE) {
     gofres <- lapply(result, eic.srm)
     data.frame(
       name=sapply(result, function(x) x$srm$name),
       llf=sapply(result, function(x) x$llf),
       df=sapply(result, function(x) x$df),
+      ks=sapply(ksres, function(x) x$p.value),
       aic=sapply(result, function(x) x$aic),
       eic=sapply(gofres, function(x) x$eic),
       eic.lower=sapply(gofres, function(x) x$eic.lower),
@@ -37,6 +39,7 @@ gof <- function(result, eic) {
       name=sapply(result, function(x) x$srm$name),
       llf=sapply(result, function(x) x$llf),
       df=sapply(result, function(x) x$df),
+      ks=sapply(ksres, function(x) x$p.value),
       aic=sapply(result, function(x) x$aic)
     )
   }
