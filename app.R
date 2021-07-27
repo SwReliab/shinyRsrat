@@ -25,7 +25,7 @@ ui <- fluidPage(
                    "text/comma-separated-values,text/plain",
                    ".csv")
        ),
-       radioButtons("type", "Data type", choices = c("Count", "General")),
+       radioButtons("type", "Data type", choices = c("Count Data", "General Data (Time Data)")),
        tags$hr(),
        htmlOutput("time"),
        htmlOutput("fault"),
@@ -43,7 +43,7 @@ ui <- fluidPage(
       mainPanel(
         tabsetPanel(type = "tabs", id = "mantabs",
                     tabPanel("Data", value = "tab1", tableOutput('table')),
-                    tabPanel("Result", value = "tab2", plotOutput('mvf'), dataTableOutput('result')),
+                    tabPanel("Result", value = "tab2", plotOutput('mvf'), plotOutput('dmvf'), dataTableOutput('result')),
                     tabPanel("Evaluation", value = "tab3", dataTableOutput('eval'))
         )
       )
@@ -62,11 +62,11 @@ server <- function(input, output, session) {
   csv_file <- reactive(read.csv(input$file$datapath))
 
   data <- reactive({
-    if (input$type == "Count") {
+    if (input$type == "Count Data") {
       x <- csv_file()[[input$time]]
       y <- csv_file()[[input$fault]]
       faultdata(time=x, fault=y)
-    } else if (input$type == "General") {
+    } else if (input$type == "General Data (Time Data)") {
       x <- csv_file()[[input$time]]
       y <- csv_file()[[input$fault]]
       z <- csv_file()[[input$indicator]]
@@ -101,11 +101,10 @@ server <- function(input, output, session) {
     })
     
     output$indicator <- renderUI({
-      if (input$type == "General") {
+      if (input$type == "General Data (Time Data)") {
         selectInput("indicator", "Indicator", colnames(csv_file()))
       }
     })
-    
   })
   
   observeEvent(input$submit, {
@@ -120,6 +119,7 @@ server <- function(input, output, session) {
     output$result <- renderDataTable(gof(result, eic = vv), options = list(paging = FALSE, searching = FALSE))
     output$eval <- renderDataTable(reliab(lapply(models(), function(m) result[[m]])), options = list(paging = FALSE, searching = FALSE))
     output$mvf <- renderPlot(mvfplot(data = data(), srms=lapply(models(), function(m) result[[m]])))
+    output$dmvf <- renderPlot(dmvfplot(data = data(), srms=lapply(models(), function(m) result[[m]])))
     updateTabsetPanel(session, "mantabs", selected = "tab2")
     removeModal()
   })
