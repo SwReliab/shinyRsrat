@@ -19,17 +19,8 @@ ui <- fluidPage(
    # Sidebar with a slider input for number of bins 
    sidebarLayout(
      sidebarPanel(
-       fileInput("file", "Choose CSV File",
-                 accept = c(
-                   "text/csv",
-                   "text/comma-separated-values,text/plain",
-                   ".csv")
-       ),
-       radioButtons("type", "Data type", choices = c("Count Data", "General Data (Time Data)")),
-       tags$hr(),
-       htmlOutput("time"),
-       htmlOutput("fault"),
-       htmlOutput("indicator"),
+       textInput("query", "Query for ASF JIRA", value =""),
+       actionButton("getdata", "Get Data"),
        tags$hr(),
        checkboxGroupInput("usemodels", "Use:", choices = srm.models, selected = NULL),
        textInput("nphase", "Phase:"),
@@ -42,8 +33,8 @@ ui <- fluidPage(
       # Show a plot of the generated distribution
       mainPanel(
         tabsetPanel(type = "tabs", id = "mantabs",
-                    tabPanel("Data", value = "tab1", tableOutput('table')),
-                    tabPanel("Result", value = "tab2", plotOutput('mvf'), plotOutput('dmvf'), dataTableOutput('result')),
+                    tabPanel("Data", value = "tab1", dataTableOutput('table')),
+                    tabPanel("Result", value = "tab2", plotOutput('mvf'), plotOutput('dmvf'), plotOutput('rate'), dataTableOutput('result')),
                     tabPanel("Evaluation", value = "tab3", dataTableOutput('eval'))
         )
       )
@@ -52,6 +43,12 @@ ui <- fluidPage(
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
+  
+  data <- reactive({
+    q <- input$query
+    ddd <- get.opendate.jira(query=q)
+    list(data=faultdata(time=ddd$time, fault=ddd$counts), table=data.frame(date=ddd$date, time=ddd$time, fault=ddd$counts))
+  })
 
   estmodels <- reactive(input$usemodels)
 
@@ -59,28 +56,13 @@ server <- function(input, output, session) {
   
   phases <- reactive(eval(parse(text=paste("c(", input$nphase, ")"))))
   
-  csv_file <- reactive(read.csv(input$file$datapath))
-
-  data <- reactive({
-    if (input$type == "Count Data") {
-      x <- csv_file()[[input$time]]
-      y <- csv_file()[[input$fault]]
-      faultdata(time=x, fault=y)
-    } else if (input$type == "General Data (Time Data)") {
-      x <- csv_file()[[input$time]]
-      y <- csv_file()[[input$fault]]
-      z <- csv_file()[[input$indicator]]
-      faultdata(time=x, fault=y, type=z)
-    }
-  })
-
   estimate <- reactive({
     result <- list()
     if (length(estmodels()) != 0) {
-      result <- c(result, estimate.ordinary(data(), estmodels()))
+      result <- c(result, estimate.ordinary(data()$data, estmodels()))
     }
     if (!is.null(phases())) {
-      result <- c(result, estimate.cph(data(), phases()))
+      result <- c(result, estimate.cph(data()$data, phases()))
     }
     result
   })
@@ -89,28 +71,16 @@ server <- function(input, output, session) {
     input$useeic
   })
   
-  observeEvent(input$file, {
-    output$table <- renderTable(csv_file())
-
-    output$time <- renderUI({
-      selectInput("time", "Time interval", colnames(csv_file()))
-    })
-    
-    output$fault <- renderUI({
-      selectInput("fault", "# of faults", colnames(csv_file()))
-    })
-    
-    output$indicator <- renderUI({
-      if (input$type == "General Data (Time Data)") {
-        selectInput("indicator", "Indicator", colnames(csv_file()))
-      }
-    })
+  observeEvent(input$getdata, {
+    showModal(modalDialog("Getting bug data...", footer=NULL))
+    output$table <- renderDataTable(data()$table, options = list(paging = FALSE, searching = FALSE))
+    removeModal()
   })
   
   observeEvent(input$submit, {
     showModal(modalDialog("Estimating...", footer=NULL))
     result <- estimate()
-    output$maxtime <- cat(sum(data()$time))
+    output$maxtime <- cat(sum(data()$data$time))
     mname <- lapply(result, function(m) m$srm$name)
     output$mm <- renderUI({
       checkboxGroupInput("models", "Models:", choices = mname, selected = mname)
@@ -118,8 +88,9 @@ server <- function(input, output, session) {
     vv <- checkeic()
     output$result <- renderDataTable(gof(result, eic = vv), options = list(paging = FALSE, searching = FALSE))
     output$eval <- renderDataTable(reliab(lapply(models(), function(m) result[[m]])), options = list(paging = FALSE, searching = FALSE))
-    output$mvf <- renderPlot(mvfplot(data = data(), srms=lapply(models(), function(m) result[[m]])))
-    output$dmvf <- renderPlot(dmvfplot(data = data(), srms=lapply(models(), function(m) result[[m]])))
+    output$mvf <- renderPlot(mvfplot(data = data()$data, srms=lapply(models(), function(m) result[[m]])))
+    output$dmvf <- renderPlot(dmvfplot(data = data()$data, srms=lapply(models(), function(m) result[[m]])))
+    output$rate <- renderPlot(rateplot(data = data()$data, srms=lapply(models(), function(m) result[[m]])))
     updateTabsetPanel(session, "mantabs", selected = "tab2")
     removeModal()
   })
