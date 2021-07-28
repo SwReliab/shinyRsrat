@@ -24,6 +24,7 @@ remotes::install_github("SwReliab/Rphsrm")
 You can try the application just by visiting to
 
 - URL: [https://okamumu.shinyapps.io/Rsrat/](https://okamumu.shinyapps.io/Rsrat/)
+- URL: [https://okamumu.shinyapps.io/RsratASFJIRA/](https://okamumu.shinyapps.io/RsratASFJIRA/)
 
 Note: The above is just a trial for this application.
 
