@@ -43,7 +43,7 @@ ui <- fluidPage(
       mainPanel(
         tabsetPanel(type = "tabs", id = "mantabs",
                     tabPanel("Data", value = "tab1", tableOutput('table')),
-                    tabPanel("Result", value = "tab2", plotOutput('mvf'), plotOutput('dmvf'), dataTableOutput('result')),
+                    tabPanel("Result", value = "tab2", plotOutput('mvf'), plotOutput('dmvf'), plotOutput('rate'), dataTableOutput('result')),
                     tabPanel("Evaluation", value = "tab3", dataTableOutput('eval'))
         )
       )
@@ -120,6 +120,7 @@ server <- function(input, output, session) {
     output$eval <- renderDataTable(reliab(lapply(models(), function(m) result[[m]])), options = list(paging = FALSE, searching = FALSE))
     output$mvf <- renderPlot(mvfplot(data = data(), srms=lapply(models(), function(m) result[[m]])))
     output$dmvf <- renderPlot(dmvfplot(data = data(), srms=lapply(models(), function(m) result[[m]])))
+    output$rate <- renderPlot(rateplot(data = data(), srms=lapply(models(), function(m) result[[m]])))
     updateTabsetPanel(session, "mantabs", selected = "tab2")
     removeModal()
   })
