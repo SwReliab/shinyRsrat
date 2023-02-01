@@ -14,6 +14,7 @@ RUN installGithub.r --deps TRUE --repos cran.rstudio.com \
     SwReliab/gof4srm \
     SwReliab/Rphsrm
 
+RUN rm -fR /srv/shiny-server/*
 COPY app.R /srv/shiny-server/app.R
 COPY functions.R /srv/shiny-server/functions.R
 
