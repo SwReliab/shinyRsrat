@@ -13,3 +13,9 @@ RUN install2.r --error --deps TRUE --repos cran.rstudio.com remotes
 RUN installGithub.r --deps TRUE --repos cran.rstudio.com \
     SwReliab/gof4srm \
     SwReliab/Rphsrm
+
+COPY app.R /srv/shiny-server/app.R
+COPY functions.R /srv/shiny-server/functions.R
+
+EXPOSE 3838
+

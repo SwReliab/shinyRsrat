@@ -33,14 +33,11 @@ Note: The above is just a trial for this application.
 The application runs on your local server with Docker. Please run
 
 ```
-docker-compose up -d
+docker build -t shiny-rsrat .
+docker run -it --rm -p 3838:3838 shiny-rsrat
 ```
 
-If you check the log of application, run
-
-```
-docker-compose up
-```
+If you can use another port of localhost, please change 3838:3838 to (your port):3838.
 
 ## Usage
 
